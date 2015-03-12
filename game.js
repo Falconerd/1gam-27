@@ -21,11 +21,7 @@ var mouse = {
 };
 var player;
 var reticle;
-
-/**
- * Places to hold things
- */
-var entities = [], enemies = [];
+var entities = [];
 
 /**
  * Load the game
@@ -61,15 +57,13 @@ var reset = function()
  */
 var init = function()
 {
-    player = new Player(0, 0, 7);
-    reticle = new Reticle();
-    entities.push(new PlayerLinkCircle(50, 50, 5, player));
-    entities.push(new PlayerLinkCircle(50, 50, 4, entities[0]));
-    entities.push(new PlayerLinkCircle(50, 50, 3, entities[1]));
-    entities.push(new PlayerLinkCircle(50, 50, 2, entities[2]));
-    entities.push(new PlayerLinkCircle(50, 50, 1, entities[3]));
-    entities.push(new EntityCircle(200, 200, { radius: 8 }));
-    entities.push(new EntityEatme(300, 200));
+    player = new Player;
+    reticle = new Reticle;
+
+    entities.push(player);
+    entities.push(reticle);
+    entities.push(new TailSegmentCircle(player));
+    entities.push(new TailSegmentCircle(entities[2], 180));
 
     canvas.addEventListener("mousemove", onMouseMove, false);
 }
@@ -82,8 +76,6 @@ var update = function()
     for (var i = entities.length - 1; i >= 0; i--) {
         entities[i].update();
     }
-    player.update();
-    reticle.update();
 }
 
 /**
@@ -96,8 +88,6 @@ var draw = function()
     for (var i = entities.length - 1; i >= 0; i--) {
         entities[i].draw();
     }
-    player.draw();
-    reticle.draw();
 }
 
 /**
@@ -116,108 +106,109 @@ var main = function()
 }
 
 /**
- * Point
+ * Event Handlers
+ */
+var onMouseMove = function(event)
+{
+    var rect = canvas.getBoundingClientRect();
+    mouse.lastX = mouse.x;
+    mouse.lastY = mouse.y;
+    mouse.x = event.clientX - rect.left;
+    mouse.y = event.clientY - rect.top;
+    mouse.velX = Math.abs(mouse.x - mouse.lastX) / canvas.width;
+    mouse.velX = Math.abs(mouse.y - mouse.lastY) / canvas.height;
+}
+
+/**
+ * Math stuff
+ */
+Math.degToRad = function(angle) { return angle * Math.PI / 180; };
+Math.radToDeg = function(angle) { return angle * 180 / Math.PI };
+
+/**
+ * ========== [ Entities ] =====================================================
  */
 var Point = function(x, y)
 {
-    this.x = x || 0;
-    this.y = y || 0;
+    this.pos = { x: x || 0, y: y || 0 };
+    this.interpolate = function(x, y, amplitude)
+    {
+        this.pos.x += (x - this.pos.x) * amplitude;
+        this.pos.y += (y - this.pos.y) * amplitude;
+    }
+    this.getPointAlongAxis = function(angle, distance)
+    {
+        return { x: distance * Math.cos(angle), y: distance * Math.sin(angle) };
+    }
+    this.getPointAlongAxis2 = function(angle, distance)
+    {
+        return { x: distance * Math.cos(Math.degToRad(angle)), y: distance * Math.sin(Math.degToRad(angle)) };
+    }
+    this.getMidPoint = function(a, b)
+    {
+        return { x: (a.x + b.x) * .5, y: (a.y + b.y) * .5 };
+    }
 }
 
-Point.prototype.interpolate = function(x, y, amplitude)
-{
-    this.x += (x - this.x) * amplitude;
-    this.y += (y - this.y) * amplitude;
-}
-
-/**
- * Entity extends Point
- */
 var Entity = function(x, y, settings)
 {
-    this.fill = "rgba(200, 0, 200, 1)";
-    this.stroke = "rgba(200, 0, 200, 1)";
+    if (!settings) settings = {
+        size: { x: 5, y: 5 },
+        pos: { x: 0, y: 0 },
+        target: null,
+    }
+
+    for (var setting in settings)
+    {
+        if (settings.hasOwnProperty(setting))
+        {
+            this[setting] = settings[setting];
+        }
+    }
+
+    this.distanceTo = function(other)
+    {
+        var x1 = other.getCentre().x;
+        var x2 = this.getCentre().x;
+        var y1 = other.getCentre().y;
+        var y2 = this.getCentre().y;
+        return Math.sqrt((x2 -= x1) * x2 + (y2 -= y1) * y2);
+    }
+
+    this.angleTo = function(other)
+    {
+        return Math.atan2(
+            (other.pos.y + other.size.y * .5) - (this.pos.y + this.size.y * .5),
+            (other.pos.x + other.size.x * .5) - (this.pos.x + this.size.x * .5));
+    }
+
+    this.getCentre = function()
+    {
+        return { x: this.pos.x - this.size.x * .5, y: this.pos.y - this.size.y * .5 };
+    }
+
+    this.update = function()
+    {
+
+    }
+
+    this.draw = function()
+    {
+
+    }
 }
 Entity.prototype = new Point;
 
-/**
- * Circular entity extends Entity
- */
-var EntityCircle = function(x, y, settings)
+var Player = function(x, y, settings)
 {
-    if (settings === undefined)
-    {
-        var settings = {};
-    }
-    this.x = x || 0;
-    this.y = y || 0;
-    this.radius = settings.radius || 8;
-    this.draw = function()
-    {
-        ctx.strokeStyle = this.stroke;
-        ctx.fillStyle = this.fill;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
-        ctx.shadowBlur = 20;
-        ctx.lineWidth = 2;
-        ctx.fillStyle = "rgba(255, 0, 200, 0.9)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-        ctx.shadowColor = "rgba(255, 0, 200, 0.9)";
-        ctx.fill();
-        ctx.stroke();
-    }
-    this.update = function()
-    {
-    }
-}
-EntityCircle.prototype = new Entity;
-
-/**
- * Eatme entity extends EntityCircle
- */
-var EntityEatme = function(x, y, settings)
-{
-    if (settings === undefined)
-    {
-        var settings = {};
-    }
-    this.x = x || 0;
-    this.y = y || 0;
-    this.radius = settings.radius || 4;
-    this.draw = function()
-    {
-        ctx.strokeStyle = this.stroke;
-        ctx.fillStyle = this.fill;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
-        ctx.shadowBlur = 20;
-        ctx.lineWidth = 2;
-        ctx.fillStyle = "rgba(0, 255, 50, 0.9)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-        ctx.shadowColor = "rgba(0, 255, 50, 0.9)";
-        ctx.fill();
-        ctx.stroke();
-    }
-    this.update = function()
-    {
-    }
-}
-EntityEatme.prototype = new EntityCircle;
-
-/**
- * Player extends Entity
- */
-var Player = function(x, y, radius)
-{
-    this.x = x || 0;
-    this.y = y || 0;
-    this.radius = radius || 8;
+    this.radius = 7;
+    this.size = { x: 14, y: 14 };
     this.speed = 25;
     this.angle = 0;
     this.draw = function()
     {
         ctx.save();
-        ctx.translate(this.x - this.radius, this.y - this.radius);
+        ctx.translate(this.getCentre().x, this.getCentre().y);
         ctx.rotate(this.angle);
 
         // --------
@@ -242,105 +233,38 @@ var Player = function(x, y, radius)
     }
     this.update = function()
     {
-        if (isNaN(delta) || delta <= 0) return;
+        // var distanceToReticle = this.distanceTo(reticle);
+        // if (distanceToReticle > this.size.x)
+        // {
+        //     this.angle = this.angleTo(reticle);
 
-        var dx = mouse.x - (this.x - this.radius);
-        var dy = mouse.y - (this.y - this.radius);
+        //     this.pos.x -= (((this.pos.x - this.size.x * .5) - (reticle.pos.x - reticle.size.x * .5)) / this.speed);
+        //     this.pos.y -= (((this.pos.y - this.size.y * .5) - (reticle.pos.y - reticle.size.y * .5)) / this.speed);
+        // }
+
+        var dx = mouse.x - (this.getCentre().x);
+        var dy = mouse.y - (this.getCentre().y);
         var distance = Math.sqrt(dx * dx + dy * dy);
         if (distance > this.radius)
         {
-            this.angle = Math.atan2(mouse.y - (this.y - this.radius), mouse.x - (this.x - this.radius));;
+            this.angle = Math.atan2(reticle.pos.y - (this.getCentre().y), reticle.pos.x - (this.getCentre().x));
 
-            this.x -= (((this.x - this.radius) - mouse.x) / this.speed);
-            this.y -= (((this.y - this.radius) - mouse.y) / this.speed);
+            this.pos.x -= (((this.getCentre().x) - reticle.pos.x) / this.speed);
+            this.pos.y -= (((this.getCentre().y) - reticle.pos.y) / this.speed);
         }
 
-        for (var i = entities.length - 1; i >= 0; i--) {
-            this.ateSummat(entities[i], i);
-        }
     }
-    this.ateSummat = function(entity, index)
-    {
-        // do things with entity
-        entities.splice(index, 1);
-    }
-    this.getCentre = function() { return { x: this.x - this.radius, y: this.y - this.radius } };
 }
-Player.prototype = new EntityCircle;
+Player.prototype = new Entity;
 
-var PlayerLinkCircle = function(x, y, radius, parent)
+var Reticle = function(x, y, settings)
 {
-    this.x = x || 0;
-    this.y = y || 0;
-    this.radius = radius || 5;
-    this.parent = parent || player;
-    this.speed = 5;
-    this.draw = function()
-    {
-        ctx.save();
-        ctx.translate(this.x - this.radius, this.y - this.radius);
-        ctx.rotate(this.angle);
-
-        // --------
-
-        ctx.shadowBlur = 20;
-        ctx.lineWidth = 2;
-        ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-        ctx.shadowColor = "rgba(0, 255, 255, 0.9)";
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.stroke();
-
-        // --------
-
-        ctx.restore();
-
-        ctx.beginPath();
-        ctx.moveTo(this.x - this.radius, this.y - this.radius);
-        ctx.quadraticCurveTo(this.getCentre().x, this.getCentre().y, this.getCentre().x + (this.parent.getCentre().x - this.getCentre().x), this.getCentre().y + (this.parent.getCentre().y - this.getCentre().y));
-        ctx.stroke();
-    }
-    this.update = function()
-    {
-        if (isNaN(delta) || delta <= 0) return;
-
-        this.centre = {
-            x: this.x - this.radius,
-            y: this.y - this.radius
-        };
-
-        var dx = (this.parent.x - this.parent.radius) - (this.x - this.radius);
-        var dy = (this.parent.y - this.parent.radius) - (this.y - this.radius);
-        var distance = Math.sqrt(dx * dx + dy * dy);
-        this.angle = Math.atan2(this.parent.getCentre().y - this.getCentre().y, this.parent.getCentre().x - this.getCentre().x);;
-        if (distance > this.radius * 3)
-        {
-            // this.x -= (((this.x - this.radius) - (this.parent.x - this.parent.radius)) / this.speed);
-            // this.y -= (((this.y - this.radius) - (this.parent.y - this.parent.radius)) / this.speed);
-            this.interpolate(this.parent.getCentre().x, this.parent.getCentre().y, 0.2);
-        }
-        else
-        {
-            //this.x -=
-        }
-    }
-    this.getCentre = function() { return { x: this.x - this.radius, y: this.y - this.radius } };
-}
-PlayerLinkCircle.prototype = new EntityCircle;
-
-var Reticle = function()
-{
-    this.x = 0;
-    this.y = 0;
+    this.size = { x: 4, y: 4 };
     this.radius = 2;
     this.draw = function()
     {
-        ctx.strokeStyle = this.stroke;
-        ctx.fillStyle = this.fill;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+        ctx.arc(this.pos.x, this.pos.y, this.radius, 0, 2 * Math.PI);
         ctx.shadowBlur = 20;
         ctx.lineWidth = 2;
         ctx.fillStyle = "rgba(0, 255, 255, 0.5)";
@@ -354,32 +278,45 @@ var Reticle = function()
         this.interpolate(mouse.x + 1, mouse.y + 1, 0.4);
     }
 }
-Reticle.prototype = new Point;
+Reticle.prototype = new Entity;
 
-/**
- * Misc functions
- */
-Math.radians = function(degrees)
+var TailSegmentCircle = function(target, offsetAngle)
 {
-    return degrees * Math.PI / 180;
-}
+    this.target = target;
+    this.radius = 10;
+    this.size = { x: 20, y: 20 };
+    this.offsetDistance = 40;
+    this.offsetAngle = offsetAngle || 0;
+    this.angle = 0;
 
-Math.degrees = function(radians)
-{
-    return radians * 180 / Math.PI;
-}
+    this.draw = function()
+    {
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, this.radius, 0, 2 * Math.PI);
+        ctx.shadowBlur = 20;
+        ctx.lineWidth = 2;
+        ctx.fillStyle = "rgba(0, 255, 255, 0.5)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+        ctx.shadowColor = "rgba(0, 255, 255, 0.5)";
+        ctx.fill();
+        ctx.stroke();
 
-
-/**
- * Event Handlers
- */
-var onMouseMove = function(event)
-{
-    var rect = canvas.getBoundingClientRect();
-    mouse.lastX = mouse.x;
-    mouse.lastY = mouse.y;
-    mouse.x = event.clientX - rect.left;
-    mouse.y = event.clientY - rect.top;
-    mouse.velX = Math.abs(mouse.x - mouse.lastX) / canvas.width;
-    mouse.velX = Math.abs(mouse.y - mouse.lastY) / canvas.height;
+        if (this.target !== null)
+        {
+            ctx.beginPath();
+            ctx.moveTo(this.pos.x, this.pos.y);
+            ctx.quadraticCurveTo(this.getMidPoint(this.pos, target.getCentre()).x, this.getMidPoint(this.pos, target.getCentre()).y, this.target.getCentre().x, this.target.getCentre().y);
+            ctx.stroke();
+        }
+    }
+    this.update = function()
+    {
+        if (this.target !== null)
+        {
+            this.angle = Math.atan2(this.target.getCentre().y - this.getCentre().y, this.target.getCentre().x - this.getCentre().x);
+            var tgt = this.getPointAlongAxis(this.target.angle + Math.degToRad(this.offsetAngle), this.offsetDistance);
+            this.interpolate(this.target.getCentre().x - tgt.x, this.target.getCentre().y - tgt.y, 0.4);
+        }
+    }
 }
+TailSegmentCircle.prototype = new Entity;
