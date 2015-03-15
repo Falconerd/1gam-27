@@ -328,6 +328,16 @@ var Modal = function(settings)
 
     this.draw = function()
     {
+
+        context.save();
+        context.translate(canvas.width / 2 - this.width / 2, canvas.height / 2 - this.height / 2);
+        context.translate(this.width / 2, -44);
+        context.textAlign = "center";
+        context.font = "38px Arial";
+        context.fillStyle = "rgba(255,255,255,1)";
+        context.fillText("MULTIPLY", 0, 0);
+        context.restore();
+
         context.save();
         context.translate(canvas.width / 2 - this.width / 2, canvas.height / 2 - this.height / 2);
         context.fillStyle = "rgba(30, 30, 30, 0.1)";
